@@ -4,6 +4,7 @@ import json
 import re
 import math
 import pandas as pd
+import requests
 import duckdb
 import streamlit as st
 
