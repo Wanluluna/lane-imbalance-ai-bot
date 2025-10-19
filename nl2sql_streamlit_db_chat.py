@@ -7,6 +7,35 @@ import pandas as pd
 import duckdb
 import streamlit as st
 
+
+DB_PATH = "/tmp/lane.duckdb"
+
+@st.cache_resource
+def get_duckdb_connection():
+    url = st.secrets.get("DUCKDB_URL") or os.getenv("DUCKDB_URL")
+    if not url:
+        st.error("❌ Missing DUCKDB_URL (please set it in Streamlit Secrets)")
+        st.stop()
+
+    if not os.path.exists(DB_PATH) or os.path.getsize(DB_PATH) < 1024:
+        st.info("⬇️ Downloading lane.duckdb ...")
+        with requests.get(url, stream=True, timeout=180) as r:
+            r.raise_for_status()
+            with open(DB_PATH, "wb") as f:
+                for chunk in r.iter_content(chunk_size=1<<20):
+                    if chunk:
+                        f.write(chunk)
+        st.success("✅ Database downloaded successfully")
+
+    con = duckdb.connect(DB_PATH, read_only=True)
+    return con
+
+con = get_duckdb_connection()
+
+
+
+
+
 # Optional: Plotly for charts (fallback to st.bar_chart if missing)
 HAS_PLOTLY = True
 try:
