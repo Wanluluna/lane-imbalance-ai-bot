@@ -8,32 +8,63 @@ import requests
 import duckdb
 import streamlit as st
 
-
 DB_PATH = "/tmp/lane.duckdb"
+
+def _download_db(url: str, dest: str):
+    st.info("⬇️ Downloading lane.duckdb ...")
+    with requests.get(url, stream=True, timeout=180) as r:
+        r.raise_for_status()
+        # 保存响应头，便于排查是否下载到 HTML
+        ct = r.headers.get("content-type", "")
+        cd = r.headers.get("content-disposition", "")
+        with open(dest, "wb") as f:
+            for chunk in r.iter_content(chunk_size=1<<20):  # 1MB
+                if chunk:
+                    f.write(chunk)
+    size = os.path.getsize(dest)
+    st.caption(f"Downloaded size: {size/1e6:.1f} MB | content-type: {ct} | content-disposition: {cd}")
 
 @st.cache_resource
 def get_duckdb_connection():
     url = st.secrets.get("DUCKDB_URL") or os.getenv("DUCKDB_URL")
     if not url:
-        st.error("❌ Missing DUCKDB_URL (please set it in Streamlit Secrets)")
+        st.error("❌ Missing DUCKDB_URL（Settings → Advanced settings → Edit secrets 中配置）")
         st.stop()
 
-    if not os.path.exists(DB_PATH) or os.path.getsize(DB_PATH) < 1024:
-        st.info("⬇️ Downloading lane.duckdb ...")
-        with requests.get(url, stream=True, timeout=180) as r:
-            r.raise_for_status()
-            with open(DB_PATH, "wb") as f:
-                for chunk in r.iter_content(chunk_size=1<<20):
-                    if chunk:
-                        f.write(chunk)
-        st.success("✅ Database downloaded successfully")
+    need_download = not os.path.exists(DB_PATH) or os.path.getsize(DB_PATH) < 1024
+    if need_download:
+        _download_db(url, DB_PATH)
 
-    con = duckdb.connect(DB_PATH, read_only=True)
-    return con
+    # 尝试连接；失败则重下一次再试
+    try:
+        con = duckdb.connect(DB_PATH, read_only=True)
+        # 快速校验一下库是否可读
+        con.execute("PRAGMA database_list")
+        st.success("✅ Database downloaded successfully")
+        return con
+    except Exception as e1:
+        # 可能下载到的是 HTML/权限页；删除并重下
+        st.warning(f"第一次连接失败，尝试重新下载：{e1}")
+        try:
+            if os.path.exists(DB_PATH):
+                os.remove(DB_PATH)
+        except Exception:
+            pass
+        _download_db(url, DB_PATH)
+        try:
+            con = duckdb.connect(DB_PATH, read_only=True)
+            con.execute("PRAGMA database_list")
+            st.success("✅ Database ready after re-download")
+            return con
+        except Exception as e2:
+            st.error(
+                "❌ 仍无法打开数据库。很可能直链需要登录或返回的是 HTML。"
+                " 请把 DUCKDB_URL 换成真正的可直接下载链接（在隐身窗口能直接下载的那种）。\n\n"
+                f"最后错误：{e2}"
+            )
+            st.stop()
 
 con = get_duckdb_connection()
-
-
 
 
 
