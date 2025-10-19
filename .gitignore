@@ -1,0 +1,6 @@
+__pycache__/
+*.ipynb_checkpoints/
+.env
+.streamlit/secrets.toml
+secrets.toml
+lane.duckdb

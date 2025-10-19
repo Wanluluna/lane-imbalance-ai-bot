@@ -1,0 +1,7 @@
+streamlit>=1.36
+pandas
+duckdb
+plotly
+sqlparse
+python-dotenv
+google-generativeai

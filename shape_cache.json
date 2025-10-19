@@ -1,0 +1,10 @@
+{
+  "lane_imbalance_clean": {
+    "rows": 418287,
+    "cols": 50
+  },
+  "target_tonnage_clean": {
+    "rows": 16908,
+    "cols": 38
+  }
+}
